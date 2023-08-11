@@ -5,17 +5,24 @@ import (
 	"strings"
 )
 
-func dockerInternal(arch, pkgName string) {
+func dockerInternal(rule string, version string) {
+	parts := strings.Split(rule, "-")
+	if len(parts) < 2 {
+		panic("invalid rule")
+	}
+	arch := parts[len(parts)-1]
+	pkgName := strings.Join(parts[:len(parts)-1], "-")
+
 	imageTag := fmt.Sprintf("%s-%s", pkgName, arch)
 	Run(nil, "docker", "build",
 		"--platform", archToDockerPlatform(arch),
 		"--tag", imageTag,
-		"--build-arg", fmt.Sprintf("TAG=%s", getTag()),
+		"--build-arg", fmt.Sprintf("TAG=%s", version),
 		"-f", fmt.Sprintf("cmd/%s/Dockerfile.%s", pkgName, arch),
 		".",
 	)
 
-	src := fmt.Sprintf("/build/%s_%s_%s.tar.gz", pkgName, getTag(), arch)
+	src := fmt.Sprintf("/build/%s_%s_%s.tar.gz", pkgName, version, arch)
 	dst := fmt.Sprintf("%s/builds/%s", Opts.SharedFolder, arch)
 
 	DockerCopy(
@@ -41,14 +48,13 @@ func DockerCopy(
 }
 
 func Docker(rule string) {
-	parts := strings.Split(rule, "-")
-	if len(parts) < 2 {
-		panic("invalid rule")
-	}
-	arch := parts[len(parts)-1]
-	pkgName := strings.Join(parts[:len(parts)-1], "-")
+	dockerInternal(rule, getTag())
+}
 
-	dockerInternal(arch, pkgName)
+func DockerWithCustomVersion(version string) func(rule string) {
+	return func(rule string) {
+		dockerInternal(rule, version)
+	}
 }
 
 func archToDockerPlatform(arch string) string {
